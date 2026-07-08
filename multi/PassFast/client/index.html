@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PassFast - 수험 종목 통합 내비게이터</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              pf: {
+                light: '#04D8FF',
+                dark: '#3004FF',
+                sub: '#212225',
+                point: '#F7220C',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+    <header class="bg-pf-sub text-white sticky top-0 z-50 shadow-md">
+      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-3">
+          <svg viewBox="0 0 36 36" fill="none" class="w-9 h-9">
+            <rect width="36" height="36" rx="10" fill="url(#logo-grad)"/>
+            <path d="M20 8L12 20h6l-2 8 8-12h-6l2-8z" fill="white" stroke="white" stroke-width="0.5" stroke-linejoin="round"/>
+            <path d="M14 24l2 2 4-5" stroke="#04D8FF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="36" y2="36"><stop offset="0%" stop-color="#3004FF"/><stop offset="100%" stop-color="#04D8FF"/></linearGradient></defs>
+          </svg>
+          <div class="flex items-baseline gap-0.5">
+            <span class="text-xl font-black tracking-tight text-white">Pass</span>
+            <span class="text-xl font-black tracking-tight bg-gradient-to-r from-pf-light to-pf-dark bg-clip-text text-transparent">Fast</span>
+          </div>
+        </a>
+        <nav id="main-nav" class="flex items-center gap-2"></nav>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-8 space-y-6">
+
+      <!-- [1행] 대시보드 활성 자격증 (학습 스페이스 버튼 포함) + D-day (보관함 포함) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 대시보드 + 학습 스페이스 버튼 -->
+        <div class="lg:col-span-2 text-white p-6 rounded-2xl shadow-xl border border-slate-700 flex items-center justify-between" style="background-color:#212225;">
+          <div class="flex-1">
+            <span class="bg-white/10 text-pf-light border border-white/20 text-xs px-2.5 py-1 rounded-full font-semibold">대시보드 활성 자격증</span>
+            <h2 id="display-certificate" class="text-3xl font-black mt-3 tracking-tight">선택 대기 중</h2>
+            <div class="mt-3">
+              <div id="display-tags" class="flex flex-wrap gap-1.5">
+               <span class="text-xs bg-white/10 text-white/70 border border-white/20 px-2.5 py-1 rounded-lg font-medium">아래 카탈로그에서 시험 종목을 선택하고 등록해 주세요.</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4 pt-3 border-t border-white/20">
+              <div>
+                <p class="text-[10px] text-white/50">목표 시험일</p>
+                <p id="display-date" class="text-xs font-bold text-white mt-0.5">-</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-white/50">합격률</p>
+                <p id="display-passrate" class="text-xs font-bold text-pf-light mt-0.5">-</p>
+              </div>
+            </div>
+            <button id="btn-wrong-report" onclick="navigateTo('review.html')" class="mt-3 bg-pf-point hover:bg-pf-point/80 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md transition items-center justify-center gap-1.5 hidden">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i> 오답분석 리포트
+            </button>
+          </div>
+          <div class="ml-6 flex-shrink-0">
+            <button onclick="goToQuiz()" class="bg-white hover:bg-slate-100 text-blue-800 font-bold py-3 px-6 rounded-xl text-sm shadow-lg transition flex items-center gap-2">
+              <i data-lucide="play" class="w-5 h-5"></i> 학습 스페이스 입장
+            </button>
+          </div>
+        </div>
+
+        <!-- D-day + 보관함 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col">
+          <div class="text-center bg-slate-50 border border-slate-100 p-4 rounded-xl">
+            <p class="text-xs font-bold text-slate-400 tracking-wider">잔여 기간</p>
+            <h3 id="display-dday" class="text-4xl font-black text-slate-400 tracking-tighter mt-1">-</h3>
+          </div>
+          <!-- 보관함 (좌우 스크롤) -->
+          <div class="mt-4 flex-1">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-xs font-bold text-slate-500 flex items-center gap-1">
+                <i data-lucide="folder-heart" class="w-3.5 h-3.5 text-pf-dark"></i>
+                보관함 <span id="basket-count" class="text-[10px] text-slate-400 font-normal ml-1">0개</span>
+              </h4>
+              <button onclick="clearVault()" class="text-[10px] text-slate-400 hover:text-pf-point transition">초기화</button>
+            </div>
+            <div id="my-cert-basket" class="flex gap-2 overflow-x-auto pb-2 scroll-smooth" style="scrollbar-width:thin;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [3행] 전체 시험 종목 + 세부 일정 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 전체 시험 종목 (2/3) -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+              <i data-lucide="layout-grid" class="w-5 h-5 text-pf-dark"></i>
+              전체 시험 종목
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">종목 카드를 클릭하면 우측 폼에 자동 기입됩니다.</p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+            <div id="tab-menu-container" class="space-y-1.5 border-r border-slate-100 pr-0 md:pr-3"></div>
+            <div class="md:col-span-3">
+              <div id="items-grid-container" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 세부 일정 (1/3) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+          <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-pf-dark"></i>
+            세부 일정
+          </h3>
+          <div class="space-y-3 text-sm">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">시험 종목</label>
+              <input type="text" id="input-certificate" readonly placeholder="좌측에서 선택" class="w-full bg-slate-50 border-2 border-pf-light/30 font-extrabold text-pf-dark rounded-xl p-2.5 text-xs focus:outline-none placeholder-slate-400" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-500 mb-1">시험 날짜</label>
+                <input type="date" id="input-date" value="2026-11-15" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-500 mb-1">시험 시간</label>
+                <input type="time" id="input-time" value="09:00" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-500 mb-1">목표 점수</label>
+                <input type="number" id="input-score" value="85" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-500 mb-1">학습 다짐</label>
+                <input type="text" id="input-memo" placeholder="다짐 작성" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none" />
+              </div>
+            </div>
+          </div>
+          <button onclick="addAndApplyDashboardData()" class="w-full bg-pf-sub hover:bg-pf-sub/80 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-1.5">
+            <i data-lucide="plus-circle" class="w-4 h-4 text-pf-light"></i> 보관함 등록
+          </button>
+        </div>
+      </div>
+
+      <!-- AI 브리핑 -->
+      <div class="bg-slate-50 border border-slate-200/60 p-6 rounded-2xl space-y-3">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="brain" class="w-4 h-4 text-pf-dark"></i> AI 분석 브리핑
+        </h3>
+        <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+          <p id="focus-core" class="text-xs text-slate-600 font-medium leading-relaxed">시험 종목을 선택하면 분석 결과가 표시됩니다.</p>
+        </div>
+      </div>
+
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+      let CATALOG_DATA = [];
+      let MASTER_CERT_DATA = {};
+      let selectedCertificateName = null;
+
+      window.onload = async function () {
+        renderNav("index.html");
+        try { CATALOG_DATA = await PassFast.getCatalog(); } catch (e) { CATALOG_DATA = []; }
+        CATALOG_DATA.forEach((cert) => {
+          const cat = cert.category;
+          if (!MASTER_CERT_DATA[cat]) MASTER_CERT_DATA[cat] = [];
+          MASTER_CERT_DATA[cat].push(cert);
+        });
+        initVisualCategoryTabs();
+        await renderBasket();
+        const active = PassFast.getActiveCert();
+        if (active) switchActiveDashboard(active);
+        lucide.createIcons();
+      };
+
+      function initVisualCategoryTabs() {
+        const mc = document.getElementById("tab-menu-container");
+        mc.innerHTML = "";
+        let isFirst = true;
+        for (const cat in MASTER_CERT_DATA) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.onclick = () => switchCategoryTab(cat, btn);
+          btn.className = isFirst
+            ? "tab-link w-full text-left px-4 py-3 rounded-xl font-bold text-xs bg-pf-dark text-white shadow-sm transition flex items-center justify-between"
+            : "tab-link w-full text-left px-4 py-3 rounded-xl font-medium text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center justify-between";
+          btn.innerHTML = '<span>' + cat + '</span><i data-lucide="chevron-right" class="w-3.5 h-3.5 opacity-70"></i>';
+          if (isFirst) { renderItemsGrid(cat); isFirst = false; }
+          mc.appendChild(btn);
+        }
+      }
+
+      function switchCategoryTab(cat, targetBtn) {
+        document.querySelectorAll(".tab-link").forEach((b) => { b.className = "tab-link w-full text-left px-4 py-3 rounded-xl font-medium text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center justify-between"; });
+        targetBtn.className = "tab-link w-full text-left px-4 py-3 rounded-xl font-bold text-xs bg-pf-dark text-white shadow-sm transition flex items-center justify-between";
+        renderItemsGrid(cat);
+      }
+
+      function renderItemsGrid(cat) {
+        const gc = document.getElementById("items-grid-container");
+        gc.innerHTML = "";
+        (MASTER_CERT_DATA[cat] || []).forEach((cert) => {
+          const card = document.createElement("div");
+          card.onclick = () => autoFillTargetForm(cert);
+          card.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-pf-light cursor-pointer text-center text-xs font-bold text-slate-700 hover:text-pf-dark transition shadow-sm select-none truncate";
+          card.innerText = cert.name;
+          gc.appendChild(card);
+        });
+        lucide.createIcons();
+      }
+
+      function autoFillTargetForm(cert) {
+        selectedCertificateName = cert;
+        document.getElementById("input-certificate").value = cert.name;
+        document.getElementById("input-memo").value = cert.name + " 합격 프로젝트";
+        document.getElementById("focus-core").innerHTML = "<strong>[" + cert.name + "]</strong> - " + (cert.description || "") + "<br><span class='text-slate-400 text-[11px]'>날짜와 목표 점수를 설정한 뒤 보관함에 등록하세요.</span>";
+      }
+
+      async function addAndApplyDashboardData() {
+        const name = document.getElementById("input-certificate").value;
+        const date = document.getElementById("input-date").value;
+        const time = document.getElementById("input-time").value;
+        const score = document.getElementById("input-score").value;
+        const memo = document.getElementById("input-memo").value;
+        if (!name || !selectedCertificateName) { alert("시험 종목을 먼저 선택해 주세요."); return; }
+        const certId = selectedCertificateName.id;
+        const result = await PassFast.addToVault({ cert_id: certId, target_date: date, target_time: time, target_score: parseInt(score), memo: memo });
+        if (result.duplicate) { alert("이미 보관함에 등록된 종목입니다."); return; }
+        const obj = { certId: certId, cert_id: certId, name: name, date: date, target_date: date, time: time, target_time: time, score: score, target_score: score, memo: memo, description: selectedCertificateName.description };
+        PassFast.setActiveCert(obj);
+        await renderBasket();
+        switchActiveDashboard(obj);
+      }
+
+      async function renderBasket() {
+        const bc = document.getElementById("my-cert-basket");
+        const cb = document.getElementById("basket-count");
+        let vault = [];
+        try { vault = await PassFast.getVault(); } catch(e) {}
+        cb.innerText = vault.length + "개";
+        if (!vault.length) { bc.innerHTML = '<div class="text-center py-3 text-xs text-slate-400 whitespace-nowrap">등록된 자격증이 없습니다.</div>'; return; }
+        bc.innerHTML = "";
+        vault.forEach((item) => {
+          const card = document.createElement("div");
+          const d = { certId: item.cert_id, cert_id: item.cert_id, name: item.name, date: item.target_date, target_date: item.target_date, time: item.target_time, target_time: item.target_time, score: item.target_score, target_score: item.target_score, memo: item.memo, description: item.description };
+          card.className = "flex-shrink-0 w-36 bg-slate-50 border border-slate-200 hover:border-pf-dark p-3 rounded-xl cursor-pointer transition text-left relative group";
+          card.onclick = (e) => { if (!e.target.closest('.del-btn')) switchActiveDashboard(d); };
+          const days = PassFast.getDDay(item.target_date);
+          const dd = days >= 0 ? "D-" + days : "D+" + Math.abs(days);
+          card.innerHTML = '<button class="del-btn absolute -top-1.5 -right-1.5 w-5 h-5 bg-pf-point text-white rounded-full text-[10px] font-bold hidden group-hover:flex items-center justify-center leading-none" onclick="deleteVaultItem(\'' + item.cert_id + '\')">&times;</button>' +
+            '<span class="text-[9px] bg-pf-dark/10 text-pf-dark px-1.5 py-0.5 rounded font-mono font-bold">' + dd + '</span>' +
+            '<p class="text-[11px] font-bold text-slate-700 truncate mt-1.5">' + item.name + '</p>' +
+            '<p class="text-[9px] text-slate-400 mt-0.5">' + (item.target_score || 85) + '점 목표</p>';
+          bc.appendChild(card);
+        });
+      }
+
+      async function deleteVaultItem(certId) {
+        if (!confirm("이 자격증을 보관함에서 삭제할까요?")) return;
+        await PassFast.removeFromVault(certId);
+        const active = PassFast.getActiveCert();
+        if (active && (active.certId === certId || active.cert_id === certId)) {
+          PassFast.clearActiveCert();
+          document.getElementById("display-certificate").innerText = "선택 대기 중";
+          document.getElementById("display-date").innerText = "-";
+          document.getElementById("display-dday").innerText = "-";
+          document.getElementById("display-dday").className = "text-4xl font-black text-slate-400 tracking-tighter mt-1";
+        }
+        await renderBasket();
+      }
+
+      async function clearVault() {
+        if (!confirm("보관함을 초기화할까요? 등록된 모든 자격증이 삭제됩니다.")) return;
+        try {
+          const vault = await PassFast.getVault();
+          for (const item of vault) {
+            await PassFast.removeFromVault(item.cert_id);
+          }
+          PassFast.clearActiveCert();
+          await renderBasket();
+          document.getElementById("display-certificate").innerText = "선택 대기 중";
+          document.getElementById("display-date").innerText = "-";
+          document.getElementById("display-dday").innerText = "-";
+          document.getElementById("display-dday").className = "text-4xl font-black text-slate-400 tracking-tighter mt-1";
+          document.getElementById("display-tags").innerHTML = '<span class="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1 rounded-lg font-medium">아래 카탈로그에서 시험 종목을 선택하고 등록해 주세요.</span>';
+          document.getElementById("focus-core").innerHTML = "시험 종목을 선택하면 분석 결과가 표시됩니다.";
+        } catch(e) { alert("초기화 실패"); }
+      }
+
+      function fmtDate(date, time) {
+        if (!date) return "-";
+        let d = date;
+        if (d.includes("T")) d = d.split("T")[0];
+        return time ? d + " " + time : d;
+      }
+
+      function switchActiveDashboard(item) {
+        const name = item.name, date = item.date || item.target_date, time = item.time || item.target_time || "", score = item.score || item.target_score;
+        PassFast.setActiveCert(item);
+        document.getElementById("display-certificate").innerText = name;
+        document.getElementById("display-date").innerText = fmtDate(date, time);
+        document.getElementById("display-passrate").innerText = "분석 대기";
+        const tc = document.getElementById("display-tags"); tc.innerHTML = "";
+        ["#목표설계", "#" + score + "점", "#스케줄링"].forEach((t) => { const s = document.createElement("span"); s.className = "text-xs bg-pf-dark/10 text-pf-light border border-pf-dark/20 px-2.5 py-1 rounded-lg font-medium"; s.innerText = t; tc.appendChild(s); });
+        const days = PassFast.getDDay(date);
+        const dn = document.getElementById("display-dday");
+        if (days !== "-") { dn.innerText = days >= 0 ? "D-" + days : "D+" + Math.abs(days); dn.className = "text-4xl font-black text-pf-point tracking-tighter mt-1"; }
+        else { dn.innerText = "-"; dn.className = "text-4xl font-black text-slate-400 tracking-tighter mt-1"; }
+        document.getElementById("btn-wrong-report").classList.add("hidden");
+        loadAiBriefing(item);
+        document.getElementById("input-certificate").value = name;
+        document.getElementById("input-date").value = date || "";
+        document.getElementById("input-time").value = time || "09:00";
+        document.getElementById("input-score").value = score;
+        document.getElementById("input-memo").value = item.memo || "";
+        lucide.createIcons();
+      }
+
+      async function loadAiBriefing(item) {
+        const name = item.name, desc = item.description || "", certId = item.certId || item.cert_id;
+        const date = item.date || item.target_date, time = item.time || item.target_time || "", score = item.score || item.target_score;
+
+        // 로딩 표시
+        document.getElementById("focus-core").innerHTML = '<span class="text-slate-400 text-xs animate-pulse">AI가 분석 중...</span>';
+
+        // 취약 과목 수집
+        let weakSubjects = [];
+        let wrongCount = 0;
+        let totalAttempts = 0;
+        try {
+          const history = await PassFast.getQuizHistory();
+          const my = history.filter(r => (r.cert_id || r.certId) === certId);
+          totalAttempts = my.length;
+          const ws = {};
+          my.forEach(r => { if (r.answers) r.answers.forEach(a => { if (!a.correct) { wrongCount++; if (a.subject_name) ws[a.subject_name] = (ws[a.subject_name] || 0) + 1; } }); });
+          weakSubjects = Object.entries(ws).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, c]) => ({ name: n, count: c }));
+        } catch (e) {}
+
+        // Gemini API 호출
+        try {
+          const res = await fetch("/api/generate/briefing", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ certName: name, certDescription: desc, weakSubjects, wrongCount, totalAttempts }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            document.getElementById("focus-core").innerHTML = data.briefing;
+            return;
+          }
+        } catch (e) {}
+
+        // API 실패 시 기본 표시
+        let h = "<strong>[" + name + "]</strong><br>";
+        if (desc) h += '<span class="text-pf-dark text-[11px] font-semibold">' + desc + "</span><br>";
+        h += '<span class="text-slate-400 text-[11px]">시험일: ' + fmtDate(date, time) + " / 목표: " + score + "점</span>";
+        document.getElementById("focus-core").innerHTML = h;
+      }
+    </script>
+  </body>
+</html>

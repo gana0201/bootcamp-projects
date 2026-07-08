@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PassFast - 오답분석 리포트</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { pf: { light:'#04D8FF', dark:'#3004FF', sub:'#212225', point:'#F7220C' } } } }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-pf-sub text-slate-100 min-h-screen">
+
+  <header class="sticky top-0 z-50 bg-pf-sub/80 backdrop-blur-xl border-b border-slate-700/50">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3">
+        <svg viewBox="0 0 36 36" fill="none" class="w-8 h-8">
+          <rect width="36" height="36" rx="10" fill="url(#logo-grad-r)"/>
+          <path d="M20 8L12 20h6l-2 8 8-12h-6l2-8z" fill="white" stroke="white" stroke-width="0.5" stroke-linejoin="round"/>
+          <path d="M14 24l2 2 4-5" stroke="#04D8FF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <defs><linearGradient id="logo-grad-r" x1="0" y1="0" x2="36" y2="36"><stop offset="0%" stop-color="#3004FF"/><stop offset="100%" stop-color="#04D8FF"/></linearGradient></defs>
+        </svg>
+        <span class="text-lg font-black tracking-tight"><span class="text-white">Pass</span><span class="bg-gradient-to-r from-pf-light to-pf-dark bg-clip-text text-transparent">Fast</span></span>
+      </a>
+      <nav id="main-nav" class="flex items-center gap-2"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- 타이틀 -->
+    <div class="text-center py-4">
+      <h1 class="text-2xl font-bold text-white mb-1">오답분석 리포트</h1>
+      <p class="text-sm text-slate-400">이전에 본 시험을 선택하면 풀었던 문제 내역을 확인할 수 있습니다.</p>
+    </div>
+
+    <!-- 시험 선택 영역 -->
+    <div id="exam-select-area" class="space-y-4">
+      <h2 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+        <i data-lucide="list" class="w-4 h-4 text-pf-light"></i>
+        응시한 시험 목록
+      </h2>
+      <div id="exam-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- 동적 렌더링 -->
+      </div>
+      <div id="empty-state" class="hidden text-center py-12">
+        <div class="w-16 h-16 mx-auto mb-4 bg-slate-800/60 rounded-full flex items-center justify-center">
+          <i data-lucide="inbox" class="w-8 h-8 text-slate-600"></i>
+        </div>
+        <h2 class="text-lg font-semibold text-slate-300 mb-2">응시 내역이 없습니다</h2>
+        <p class="text-sm text-slate-500 mb-6">학습 스페이스에서 문제를 풀면 여기에 내역이 표시됩니다.</p>
+        <a href="quiz.html" class="inline-flex items-center gap-2 px-5 py-2.5 bg-pf-dark hover:bg-pf-dark/80 text-white text-sm font-medium rounded-xl transition-colors">
+          <i data-lucide="pen-tool" class="w-4 h-4"></i> 학습 스페이스 가기
+        </a>
+      </div>
+    </div>
+
+    <!-- 풀이 내역 상세 (시험 선택 후 표시) -->
+    <div id="detail-area" class="hidden space-y-6">
+      <button onclick="showExamList()" class="flex items-center gap-2 text-sm text-slate-400 hover:text-pf-light transition">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> 목록으로 돌아가기
+      </button>
+
+      <!-- 요약 -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+        <h2 id="detail-title" class="text-lg font-bold text-white mb-3"></h2>
+        <div class="grid grid-cols-4 gap-3">
+          <div class="text-center">
+            <p class="text-xs text-slate-400">총 문항</p>
+            <p id="detail-total" class="text-xl font-bold text-white">0</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-400">정답</p>
+            <p id="detail-correct" class="text-xl font-bold text-pf-light">0</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-400">오답</p>
+            <p id="detail-wrong" class="text-xl font-bold text-pf-point">0</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-400">점수</p>
+            <p id="detail-score" class="text-xl font-bold text-pf-light">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 문제 리스트 -->
+      <div id="questions-list" class="space-y-4">
+        <!-- 동적 렌더링 -->
+      </div>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    let quizHistory = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      renderNav('review.html');
+      try { quizHistory = await PassFast.getQuizHistory(); } catch(e) { quizHistory = []; }
+      renderExamList();
+    });
+
+    function renderExamList() {
+      const container = document.getElementById('exam-list');
+      const emptyState = document.getElementById('empty-state');
+
+      if (quizHistory.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      container.innerHTML = quizHistory.map((exam, idx) => {
+        const certName = exam.cert_name || exam.certName || '알 수 없음';
+        const score = exam.score_percent || exam.scorePercent || 0;
+        const passed = exam.passed;
+        const date = exam.completed_at || exam.completedAt;
+        const dateStr = date ? PassFast.formatDate(date) : '';
+        const total = exam.total_questions || exam.totalQuestions || 0;
+        const correct = exam.correct_count || exam.correctCount || 0;
+        const wrong = exam.wrong_count || exam.wrongCount || 0;
+
+        return `
+          <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 cursor-pointer hover:border-pf-light/50 transition-all"
+               onclick="showDetail(${idx})">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-bold text-white">${certName}</span>
+              <span class="text-xs px-2 py-0.5 rounded font-bold ${passed ? 'bg-pf-light/20 text-pf-light' : 'bg-pf-point/20 text-pf-point'}">${passed ? '합격' : '불합격'}</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>${dateStr}</span>
+              <span>${score}점 (${correct}/${total})</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function showDetail(idx) {
+      const exam = quizHistory[idx];
+      if (!exam) return;
+
+      document.getElementById('exam-select-area').classList.add('hidden');
+      document.getElementById('detail-area').classList.remove('hidden');
+
+      const certName = exam.cert_name || exam.certName || '알 수 없음';
+      const score = exam.score_percent || exam.scorePercent || 0;
+      const total = exam.total_questions || exam.totalQuestions || 0;
+      const correct = exam.correct_count || exam.correctCount || 0;
+      const wrong = exam.wrong_count || exam.wrongCount || 0;
+      const date = exam.completed_at || exam.completedAt;
+
+      document.getElementById('detail-title').textContent = certName + (date ? ' - ' + PassFast.formatDate(date) : '');
+      document.getElementById('detail-total').textContent = total;
+      document.getElementById('detail-correct').textContent = correct;
+      document.getElementById('detail-wrong').textContent = wrong;
+      document.getElementById('detail-score').textContent = score + '점';
+
+      // 문제 리스트 렌더링
+      const answers = exam.answers || [];
+      const container = document.getElementById('questions-list');
+
+      if (answers.length === 0) {
+        container.innerHTML = '<p class="text-sm text-slate-500 text-center py-8">문제 상세 데이터가 없습니다.</p>';
+        return;
+      }
+
+      const choiceLabels = ['A','B','C','D'];
+      container.innerHTML = answers.map((a, i) => {
+        const isCorrect = a.correct;
+        const borderColor = isCorrect ? 'border-pf-light/30' : 'border-pf-point/30';
+        const icon = isCorrect ? '<span class="text-pf-light font-bold">O</span>' : '<span class="text-pf-point font-bold">X</span>';
+
+        let choicesHtml = '';
+        if (a.choices) {
+          choicesHtml = a.choices.map((choice, ci) => {
+            let style = 'bg-slate-700/30 border-slate-600/30 text-slate-400';
+            if (ci === a.correctAnswer) style = 'bg-pf-light/10 border-pf-light/40 text-pf-light';
+            else if (ci === a.selectedAnswer && !isCorrect) style = 'bg-pf-point/10 border-pf-point/40 text-pf-point line-through';
+            return '<div class="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs '+style+'"><span class="font-bold">'+choiceLabels[ci]+'</span><span>'+choice+'</span></div>';
+          }).join('');
+        }
+
+        return `
+          <div class="bg-slate-800/60 border ${borderColor} rounded-2xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="w-7 h-7 rounded-lg bg-slate-700/50 flex items-center justify-center text-sm font-bold">${i+1}</span>
+              ${icon}
+              ${a.subject_name ? '<span class="text-[10px] bg-slate-700 text-slate-400 px-2 py-0.5 rounded">'+a.subject_name+'</span>' : ''}
+            </div>
+            <p class="text-sm font-medium text-white mb-3 leading-relaxed">${a.question}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">${choicesHtml}</div>
+            ${a.explanation ? '<div class="bg-slate-700/20 border border-slate-600/20 rounded-xl p-3"><p class="text-xs text-slate-300 leading-relaxed"><span class="text-pf-light font-semibold">해설:</span> '+a.explanation+'</p></div>' : ''}
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function showExamList() {
+      document.getElementById('detail-area').classList.add('hidden');
+      document.getElementById('exam-select-area').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
