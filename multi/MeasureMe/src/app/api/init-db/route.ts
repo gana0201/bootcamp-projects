@@ -9,9 +9,17 @@ export async function POST() {
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        height NUMERIC,
+        weight NUMERIC,
+        gender TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    // Add profile columns if they don't exist (for existing tables)
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS height NUMERIC`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS weight NUMERIC`);
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT`);
 
     await query(`
       CREATE TABLE IF NOT EXISTS analyses (

@@ -8,7 +8,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "default-s
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json();
+    const { name, email, password, rememberMe } = await request.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "모든 필드를 입력하세요" }, { status: 400 });
@@ -29,16 +29,29 @@ export async function POST(request: NextRequest) {
 
     const token = await new SignJWT({ userId: id, name, email })
       .setProtectedHeader({ alg: "HS256" })
-      .setExpirationTime("7d")
+      .setExpirationTime(rememberMe ? "7d" : "12h")
       .sign(JWT_SECRET);
 
     const response = NextResponse.json({ success: true, user: { name, email } });
-    response.cookies.set("auth-token", token, {
+
+    const cookieOptions: {
+      httpOnly: boolean;
+      secure: boolean;
+      sameSite: "lax";
+      path: string;
+      maxAge?: number;
+    } = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+      path: "/",
+    };
+
+    if (rememberMe) {
+      cookieOptions.maxAge = 60 * 60 * 24 * 7;
+    }
+
+    response.cookies.set("auth-token", token, cookieOptions);
 
     return response;
   } catch (error) {

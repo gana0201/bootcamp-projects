@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,9 @@ export default function LoginPage() {
 
     try {
       const endpoint = isSignup ? "/api/auth/signup" : "/api/auth/login";
-      const body = isSignup ? { name, email, password } : { email, password };
+      const body = isSignup
+        ? { name, email, password, rememberMe }
+        : { email, password, rememberMe };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -32,7 +35,7 @@ export default function LoginPage() {
         throw new Error(data.error || "오류가 발생했습니다");
       }
 
-      router.push("/");
+      router.push("/mypage");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다");
@@ -86,6 +89,17 @@ export default function LoginPage() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-600">자동 로그인</span>
+        </label>
+
         <button
           type="submit"
           disabled={loading}

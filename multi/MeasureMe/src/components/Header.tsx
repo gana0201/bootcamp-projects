@@ -2,19 +2,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Ruler, ShieldCheck } from "lucide-react";
 
 export default function Header() {
   const [user, setUser] = useState<{ name: string } | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.user) setUser(data.user);
+      .then((res) => {
+        if (res.ok) return res.json();
+        setUser(null);
+        return null;
       })
-      .catch(() => {});
-  }, []);
+      .then((data) => {
+        if (data?.user?.name) setUser(data.user);
+        else setUser(null);
+      })
+      .catch(() => setUser(null));
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
@@ -41,7 +48,7 @@ export default function Header() {
             <ShieldCheck className="w-3.5 h-3.5 text-brand-primary" /> 개인정보 보호 적용
           </span>
 
-          {user ? (
+          {user && user.name ? (
             <Link
               href="/mypage"
               className="rounded-xl bg-brand-light/60 border border-brand-cream/60 px-3.5 py-1.5 text-xs font-extrabold text-brand-dark hover:bg-brand-light transition-all"
