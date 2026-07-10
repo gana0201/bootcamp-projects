@@ -4,9 +4,9 @@ import { useState } from "react";
 import { FileText, CheckCircle2, Sparkles, Sliders, Info, Check, RefreshCw, Wand2 } from "lucide-react";
 import type { AnalysisResult } from "@/types";
 
-interface Props { result: AnalysisResult; onReset: () => void; humanImageUrl?: string; garmentImageUrl?: string; }
+interface Props { result: AnalysisResult; onReset: () => void; humanImageUrl?: string; garmentImageUrl?: string; profileHeight?: number; }
 
-export default function FitReportView({ result, onReset, humanImageUrl, garmentImageUrl }: Props) {
+export default function FitReportView({ result, onReset, humanImageUrl, garmentImageUrl, profileHeight }: Props) {
   const { report, bodyAnalysis, garmentData } = result;
   const [tryOnImage, setTryOnImage] = useState<string>("");
   const [tryOnLoading, setTryOnLoading] = useState(false);
@@ -28,6 +28,7 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
             estimatedBodyMeasurements: bodyAnalysis.estimatedMeasurements,
             category: garmentData.category,
             sizeRecommendation: report.sizeRecommendation,
+            height: profileHeight,
           },
         }),
       });

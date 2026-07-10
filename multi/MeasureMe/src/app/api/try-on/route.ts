@@ -15,6 +15,8 @@ export interface FitContext {
   category?: string;
   // 실측값 없을 때 대체 표시용 추천 사이즈
   sizeRecommendation?: string;
+  // 키(cm) - 총장 기준 판단에 사용
+  height?: number;
 }
 
 export async function POST(request: NextRequest) {

@@ -99,11 +99,9 @@ export function checkWearability(fitContext?: FitContext): {
 }
 
 /**
- * 의류 실측값과 추정 신체 치수를 비교하여 핏 지시 프롬프트 생성.
- *
- * 중요: 어깨너비는 직선 너비(cm)이므로 둘레 환산 없이 그대로 비교.
- * 가슴/허리/엉덩이 단면값은 ×2하여 둘레로 환산 후 비교.
- * 평균 계산 시 어깨너비 제외 — 둘레와 직선 너비를 혼합하면 수치가 왜곡됨.
+ * 의류 실측값과 추정 신체 치수를 비교하여 시각적으로 표현 가능한 핏 묘사를 생성.
+ * "타이트하게 당긴다" 같은 물리 표현 대신,
+ * 옷 길이가 짧다, 소매가 짧다, 몸에 붙는다 같은 시각적 결과로 표현.
  */
 function buildFitInstruction(fitContext?: FitContext): string {
   const g = fitContext?.garmentMeasurements;
@@ -112,88 +110,92 @@ function buildFitInstruction(fitContext?: FitContext): string {
 
   if (!g || Object.keys(g).length === 0 || !b) {
     const sizeText = sizeRec ? `추천 사이즈 ${sizeRec} 기준으로` : "";
-    return `${sizeText} 체형에 자연스럽게 맞는 핏으로 표현. 옷의 원래 디자인 실루엣을 유지하며 깔끔하게 착용된 모습으로 표현.`;
+    return `${sizeText} 체형에 자연스럽게 맞는 핏으로 표현. 옷의 원래 디자인 실루엣을 유지하며 깔끔하게 착용된 모습.`;
   }
 
-  // 둘레 기반 부위 (단면 × 2 = 둘레 → 신체 둘레와 비교)
-  const circumferenceEase: Record<string, number> = {};
+  const lines: string[] = [];
+
+  // ── 가슴 ──────────────────────────────────────────────
   if (g["가슴단면"] && b.chestCircumference) {
-    circumferenceEase["가슴"] = g["가슴단면"] * 2 - parseFloat(b.chestCircumference);
-  }
-  if (g["허리단면"] && b.waistCircumference) {
-    circumferenceEase["허리"] = g["허리단면"] * 2 - parseFloat(b.waistCircumference);
-  }
-  if (g["엉덩이단면"] && b.hipCircumference) {
-    circumferenceEase["엉덩이"] = g["엉덩이단면"] * 2 - parseFloat(b.hipCircumference);
-  }
-
-  // 어깨너비: 직선 너비끼리 비교 (별도 처리)
-  let shoulderNote = "";
-  if (g["어깨너비"] && b.shoulderWidth) {
-    const shoulderEase = g["어깨너비"] - parseFloat(b.shoulderWidth);
-    if (shoulderEase < -2) {
-      shoulderNote = `어깨: 옷 어깨너비(${g["어깨너비"]}cm)가 신체(${b.shoulderWidth}cm)보다 ${Math.abs(shoulderEase).toFixed(1)}cm 좁아 어깨가 걸리는 모습`;
-    } else if (shoulderEase < 2) {
-      shoulderNote = `어깨: 딱 맞는 어깨너비`;
-    } else if (shoulderEase < 8) {
-      shoulderNote = `어깨: 어깨너비 여유 ${shoulderEase.toFixed(1)}cm로 자연스러운 핏`;
+    const garmentChest = g["가슴단면"] * 2;
+    const bodyChest = parseFloat(b.chestCircumference);
+    const ease = garmentChest - bodyChest;
+    if (ease < -4) {
+      lines.push(`가슴에 옷감이 팽팽하게 밀착되어 몸의 굴곡이 그대로 드러나는 실루엣`);
+    } else if (ease < 2) {
+      lines.push(`가슴 부위가 몸에 딱 붙는 슬림한 실루엣`);
+    } else if (ease < 8) {
+      lines.push(`가슴 부위가 자연스럽게 맞는 핏`);
+    } else if (ease < 16) {
+      lines.push(`가슴 부위에 여유가 있어 약간 루즈한 실루엣`);
     } else {
-      shoulderNote = `어깨: 어깨너비 여유 ${shoulderEase.toFixed(1)}cm로 어깨가 흘러내리는 오버핏`;
+      lines.push(`가슴 부위가 매우 넉넉하여 헐렁하게 걸쳐진 실루엣`);
     }
   }
 
-  if (Object.keys(circumferenceEase).length === 0 && !shoulderNote) {
+  // ── 어깨 (직선값 비교) ────────────────────────────────
+  if (g["어깨너비"] && b.shoulderWidth) {
+    const ease = g["어깨너비"] - parseFloat(b.shoulderWidth);
+    if (ease < -2) {
+      lines.push(`어깨가 옷보다 넓어 어깨 솔기가 팔 쪽으로 당겨진 모습`);
+    } else if (ease < 4) {
+      lines.push(`어깨 솔기가 어깨 끝에 딱 맞게 위치`);
+    } else if (ease < 10) {
+      lines.push(`어깨 솔기가 어깨 끝에서 약간 흘러내린 드롭숄더 스타일`);
+    } else {
+      lines.push(`어깨 솔기가 어깨에서 많이 흘러내린 오버사이즈 드롭숄더`);
+    }
+  }
+
+  // ── 총장 (키 대비 상의 길이) ──────────────────────────
+  if (g["총장"] && b.chestCircumference) {
+    // 키를 직접 받지 않으므로 가슴둘레로 체격 추정 후 상의 기준 길이와 비교
+    // 일반적으로 상의 정상 길이: 키 × 0.38~0.42 (허리~엉덩이 중간까지)
+    // fitContext에 키 정보가 있으면 사용
+    const height = fitContext?.height;
+    if (height) {
+      const normalLength = height * 0.40; // 키의 40%가 일반 상의 기준
+      const diff = g["총장"] - normalLength;
+      if (diff < -10) {
+        lines.push(`총장 ${g["총장"]}cm로 키 대비 매우 짧아 배꼽 위까지만 내려오는 크롭 기장`);
+      } else if (diff < -4) {
+        lines.push(`총장 ${g["총장"]}cm로 키 대비 짧아 배꼽 근처까지 내려오는 기장`);
+      } else if (diff < 4) {
+        lines.push(`총장 ${g["총장"]}cm로 키에 적당한 기장`);
+      } else {
+        lines.push(`총장 ${g["총장"]}cm로 엉덩이 아래까지 내려오는 긴 기장`);
+      }
+    }
+  }
+
+  // ── 소매 ─────────────────────────────────────────────
+  if (g["소매길이"]) {
+    const sleeve = g["소매길이"];
+    if (sleeve < 50) {
+      lines.push(`소매길이 ${sleeve}cm로 손목보다 짧게 올라오는 7부~반팔 기장`);
+    } else if (sleeve < 58) {
+      lines.push(`소매길이 ${sleeve}cm로 손목 근처 기장`);
+    } else {
+      lines.push(`소매길이 ${sleeve}cm로 손목 아래까지 내려오는 긴 소매`);
+    }
+  }
+
+  // ── 허리/엉덩이 ───────────────────────────────────────
+  if (g["허리단면"] && b.waistCircumference) {
+    const ease = g["허리단면"] * 2 - parseFloat(b.waistCircumference);
+    if (ease < -4) lines.push(`허리 부위가 몸에 꽉 끼어 몸 라인이 드러나는 실루엣`);
+    else if (ease < 4) lines.push(`허리 부위가 딱 맞는 핏`);
+    else if (ease > 12) lines.push(`허리 부위가 넉넉하게 여유로운 핏`);
+  }
+
+  if (lines.length === 0) {
     const sizeText = sizeRec ? `추천 사이즈 ${sizeRec} 기준으로` : "";
     return `${sizeText} 체형에 자연스럽게 맞는 핏으로 표현.`;
   }
 
-  // 둘레 기반 부위만으로 전체 타이트 수준 판단 (어깨너비 제외)
-  const circumEaseValues = Object.values(circumferenceEase);
-  const avgEase = circumEaseValues.length > 0
-    ? circumEaseValues.reduce((a, b) => a + b, 0) / circumEaseValues.length
-    : 5; // 데이터 없으면 중간값
-  const minEase = circumEaseValues.length > 0 ? Math.min(...circumEaseValues) : 5;
-
-  // 둘레 부위별 묘사
-  const circumLines = Object.entries(circumferenceEase).map(([part, ease]) => {
-    if (ease < -8)  return `  - ${part}: 옷 둘레가 신체보다 ${Math.abs(ease).toFixed(1)}cm 작음 → 매우 꽉 끼고 옷감이 터질 듯 팽팽`;
-    if (ease < -4)  return `  - ${part}: 옷 둘레가 신체보다 ${Math.abs(ease).toFixed(1)}cm 작음 → 꽉 끼고 몸 라인 그대로 드러남`;
-    if (ease < 0)   return `  - ${part}: 옷 둘레가 신체보다 ${Math.abs(ease).toFixed(1)}cm 작음 → 타이트하게 달라붙음`;
-    if (ease < 4)   return `  - ${part}: 여유분 ${ease.toFixed(1)}cm → 딱 맞는 핏`;
-    if (ease < 10)  return `  - ${part}: 여유분 ${ease.toFixed(1)}cm → 자연스럽고 편안한 핏`;
-    if (ease < 20)  return `  - ${part}: 여유분 ${ease.toFixed(1)}cm → 루즈한 핏`;
-    return              `  - ${part}: 여유분 ${ease.toFixed(1)}cm → 매우 헐렁한 오버사이즈`;
-  }).join("\n");
-
-  const allPartLines = [circumLines, shoulderNote ? `  - ${shoulderNote}` : ""].filter(Boolean).join("\n");
-
-  let overallDirective: string;
-  if (minEase < -8 || avgEase < -4) {
-    overallDirective =
-      `[필수] 이 옷은 착용자 신체보다 훨씬 작아 억지로 끼워 입은 상태입니다.\n` +
-      `옷감이 팽팽하게 당기고 몸의 굴곡이 그대로 드러나야 합니다.\n` +
-      `절대 "보기 좋게" 보정하지 말고 실제로 작은 옷을 입은 모습을 사실적으로 묘사하세요.`;
-  } else if (minEase < -2 || avgEase < 2) {
-    overallDirective =
-      `[필수] 이 옷은 착용자 신체에 비해 타이트합니다.\n` +
-      `몸의 곡선이 옷 위로 드러나고 딱 달라붙는 느낌이 명확히 보여야 합니다.\n` +
-      `여유 있는 핏으로 보정하지 마세요.`;
-  } else if (minEase < 0 || avgEase < 4) {
-    overallDirective =
-      `이 옷은 착용자 신체에 딱 맞거나 약간 타이트합니다.\n` +
-      `슬림하게 달라붙는 핏으로 표현하세요.`;
-  } else if (avgEase > 20) {
-    overallDirective =
-      `[필수] 이 옷은 착용자 신체보다 매우 큽니다.\n` +
-      `옷이 몸에서 떠 있고 헐렁하게 걸쳐진 오버사이즈 모습이 명확히 보여야 합니다.\n` +
-      `타이트하게 보정하지 마세요.`;
-  } else if (avgEase > 10) {
-    overallDirective = `이 옷은 착용자 신체보다 약간 큽니다. 루즈하게 입혀진 모습으로 표현하세요.`;
-  } else {
-    overallDirective = `이 옷은 착용자 신체에 잘 맞습니다. 자연스럽고 편안하게 맞는 핏으로 표현하세요.`;
-  }
-
-  return `${overallDirective}\n\n부위별 수치:\n${allPartLines}`;
+  // 전체 요약 지시
+  const summary = lines.join(", ");
+  return `이 옷의 착용 모습을 아래 수치 기반으로 정확하게 표현하세요:\n${lines.map(l => `  - ${l}`).join("\n")}\n\n이 시각적 특성들이 이미지에 명확하게 드러나야 합니다. 실루엣과 기장을 수치에 맞게 반드시 표현하세요.`;
 }
 
 /**

@@ -175,6 +175,7 @@ export default function Home() {
             onReset={handleReset}
             humanImageUrl={imageUrl}
             garmentImageUrl={garmentImgUrl}
+            profileHeight={profileData.height ? Number(profileData.height) : undefined}
           />
         </div>
       )}
