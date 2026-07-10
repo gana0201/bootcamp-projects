@@ -6,11 +6,9 @@ import type { FitContext } from "@/app/api/try-on/route";
 const apiKey = process.env.OPENAI_API_KEY;
 
 // OpenAI 이미지 생성/편집 모델 (env로 전환 가능)
-// - 개발/평소: gpt-image-1-mini (저렴)
-// - 시연: gpt-image-1 (고품질, 비쌈)
+// 평소: gpt-image-1-mini (저렴) / 시연: gpt-image-1 (고품질)
 const IMAGE_MODEL = process.env.TRYON_IMAGE_MODEL || "gpt-image-1-mini";
-// 품질: low | medium | high (기본 low = 저렴)
-const IMAGE_QUALITY = (process.env.TRYON_IMAGE_QUALITY || "low") as
+const IMAGE_QUALITY = (process.env.TRYON_IMAGE_QUALITY || "medium") as
   | "low"
   | "medium"
   | "high";
@@ -19,6 +17,12 @@ interface ImageBuffer {
   buffer: Buffer;
   fileName: string;
   mimeType: string;
+}
+
+function extFromMime(mimeType: string): string {
+  if (mimeType.includes("png")) return "png";
+  if (mimeType.includes("webp")) return "webp";
+  return "jpg";
 }
 
 /**
@@ -33,7 +37,6 @@ async function imageToBuffer(imageUrl: string, label: string): Promise<ImageBuff
     return { buffer, fileName: `${label}.${extFromMime(mimeType)}`, mimeType };
   }
 
-  // data URL 처리
   if (imageUrl.startsWith("data:")) {
     const match = imageUrl.match(/^data:(.+?);base64,(.+)$/);
     if (match) {
@@ -55,15 +58,77 @@ async function imageToBuffer(imageUrl: string, label: string): Promise<ImageBuff
   return { buffer, fileName: `${label}.${ext}`, mimeType };
 }
 
-function extFromMime(mimeType: string): string {
-  if (mimeType.includes("png")) return "png";
-  if (mimeType.includes("webp")) return "webp";
-  return "jpg";
+/**
+ * 의류 실측값(cm)과 AI 추정 신체 치수(cm)를 직접 비교하여
+ * 타이트/루즈 정도를 이미지 생성 프롬프트 지시로 변환
+ *
+ * - 의류 단면값(가슴단면, 허리단면 등)은 절반 치수이므로 ×2하여 둘레로 환산
+ * - 여유분(ease) = 의류 둘레 - 신체 둘레
+ */
+function buildFitInstruction(fitContext?: FitContext): string {
+  if (!fitContext?.garmentMeasurements || !fitContext?.estimatedBodyMeasurements) {
+    return "옷이 체형에 맞게 자연스럽게 입혀지도록 할 것 (주름, 실루엣 표현)";
+  }
+
+  const g = fitContext.garmentMeasurements;
+  const b = fitContext.estimatedBodyMeasurements;
+  const easeMap: Record<string, number> = {};
+
+  if (g["가슴단면"] && b.chestCircumference) {
+    easeMap["가슴"] = g["가슴단면"] * 2 - parseFloat(b.chestCircumference);
+  }
+  if (g["어깨너비"] && b.shoulderWidth) {
+    easeMap["어깨"] = g["어깨너비"] - parseFloat(b.shoulderWidth);
+  }
+  if (g["허리단면"] && b.waistCircumference) {
+    easeMap["허리"] = g["허리단면"] * 2 - parseFloat(b.waistCircumference);
+  }
+  if (g["엉덩이단면"] && b.hipCircumference) {
+    easeMap["엉덩이"] = g["엉덩이단면"] * 2 - parseFloat(b.hipCircumference);
+  }
+
+  if (Object.keys(easeMap).length === 0) {
+    return "옷이 체형에 맞게 자연스럽게 입혀지도록 할 것 (주름, 실루엣 표현)";
+  }
+
+  const easeValues = Object.values(easeMap);
+  const avgEase = easeValues.reduce((a, b) => a + b, 0) / easeValues.length;
+  const minEase = Math.min(...easeValues);
+
+  const partDescriptions = Object.entries(easeMap)
+    .map(([part, ease]) => {
+      if (ease < -2) return `${part} 부위: 옷이 신체보다 ${Math.abs(ease).toFixed(1)}cm 작아 매우 꽉 끼는 상태`;
+      if (ease < 2)  return `${part} 부위: 여유분 ${ease.toFixed(1)}cm로 타이트하게 맞는 상태`;
+      if (ease < 8)  return `${part} 부위: 여유분 ${ease.toFixed(1)}cm로 적당히 맞는 상태`;
+      return             `${part} 부위: 여유분 ${ease.toFixed(1)}cm로 넉넉한 상태`;
+    })
+    .join(", ");
+
+  let overallInstruction: string;
+  if (minEase < -3 || avgEase < -1) {
+    overallInstruction =
+      `옷이 신체보다 작아 전체적으로 매우 꽉 끼는 모습으로 사실적으로 표현할 것. ` +
+      `옷감이 팽팽하게 당기고 몸의 곡선이 그대로 드러나며 솔기와 단추 부위에 긴장감이 보이도록 묘사.`;
+  } else if (minEase < 0 || avgEase < 3) {
+    overallInstruction =
+      `옷이 체형에 비해 약간 작거나 딱 맞아 타이트하게 입혀진 모습으로 표현할 것. ` +
+      `몸의 실루엣이 옷 위로 드러나고 옷감이 살짝 당기는 느낌을 표현.`;
+  } else if (avgEase > 15) {
+    overallInstruction =
+      `옷이 체형보다 많이 커서 오버사이즈로 여유롭게 걸쳐진 모습으로 표현할 것. ` +
+      `옷감이 자연스럽게 늘어지고 실루엣이 넉넉하게 표현.`;
+  } else {
+    overallInstruction =
+      `옷이 체형에 적당히 맞는 자연스러운 핏으로 표현할 것. ` +
+      `깔끔하게 떨어지는 실루엣으로 표현.`;
+  }
+
+  return `${overallInstruction}\n부위별 상세: ${partDescriptions}.`;
 }
 
 /**
- * OpenAI gpt-image-1을 이용한 가상 피팅 이미지 생성.
- * 사람 전신 사진에 의류 사진의 옷을 입힌 이미지를 생성한다.
+ * OpenAI 이미지 편집 모델을 이용한 가상 피팅 이미지 생성.
+ * 사람 전신 사진 + 의류 사진을 입력으로 받아, 실측값 기반 타이트/루즈 표현을 포함한 피팅 이미지를 생성.
  * 결과는 data URL(base64) 형태로 반환.
  */
 export async function virtualTryOn(
@@ -85,36 +150,7 @@ export async function virtualTryOn(
     await toFile(garment.buffer, garment.fileName, { type: garment.mimeType }),
   ];
 
-  // fitScore 기반으로 핏 표현 방식 결정
-  let fitInstruction = "옷이 체형에 맞게 자연스럽게 입혀지도록 할 것 (주름, 실루엣 표현)";
-  if (fitContext?.fitScore !== undefined) {
-    const score = fitContext.fitScore;
-    if (score <= 4) {
-      fitInstruction = `옷이 사람의 체형보다 작아서 매우 타이트하게 맞는 모습으로 표현할 것.
-가슴, 어깨, 허리 부위에서 옷감이 당기고 팽팽하게 늘어난 주름을 표현할 것.
-버튼 사이나 솔기 부분이 벌어질 듯한 긴장감을 사실적으로 묘사할 것.`;
-    } else if (score <= 6) {
-      fitInstruction = `옷이 체형보다 약간 작아서 타이트하게 맞는 모습으로 표현할 것.
-몸의 곡선이 옷 위로 드러나고 옷감이 약간 당기는 느낌을 표현할 것.`;
-    } else if (score <= 8) {
-      fitInstruction = `옷이 체형에 잘 맞는 자연스러운 핏으로 표현할 것.
-너무 타이트하거나 너무 여유롭지 않고 깔끔하게 떨어지는 실루엣을 표현할 것.`;
-    } else {
-      fitInstruction = `옷이 체형에 완벽하게 맞는 이상적인 핏으로 표현할 것.
-자연스럽게 떨어지는 실루엣과 편안해 보이는 착용감을 표현할 것.`;
-    }
-  }
-
-  // 부위별 핏 상세 정보 추가
-  let detailInstruction = "";
-  if (fitContext?.details) {
-    const parts = Object.entries(fitContext.details)
-      .map(([key, val]) => `- ${key}: ${val}`)
-      .join("\n");
-    if (parts) {
-      detailInstruction = `\n\n부위별 핏 참고사항 (이미지에 반영할 것):\n${parts}`;
-    }
-  }
+  const fitInstruction = buildFitInstruction(fitContext);
 
   const prompt = `첫 번째 이미지는 사람의 전신 사진이고, 두 번째 이미지는 의류입니다.
 첫 번째 이미지의 사람이 두 번째 이미지의 옷을 입고 있는 사실적인 전신 사진을 생성해주세요.
@@ -124,7 +160,7 @@ export async function virtualTryOn(
 - 옷의 색상, 패턴, 디자인, 질감을 정확하게 반영할 것
 - ${fitInstruction}
 - 배경과 조명은 원본 사람 사진과 비슷하게 유지할 것
-- 사진처럼 사실적으로(photorealistic) 표현할 것${detailInstruction}`;
+- 사진처럼 사실적으로(photorealistic) 표현할 것`;
 
   const editParams: Parameters<typeof client.images.edit>[0] = {
     model: IMAGE_MODEL,
@@ -134,12 +170,11 @@ export async function virtualTryOn(
     size: "1024x1536",
   };
 
-  // input_fidelity는 gpt-image-1에서만 지원 (mini는 미지원)
+  // input_fidelity는 gpt-image-1에서만 지원
   if (IMAGE_MODEL === "gpt-image-1") {
     editParams.input_fidelity = "high";
   }
 
-  // edit()의 반환 타입은 스트림 union을 포함하므로 비스트림 응답 형태로 좁힌다
   const response = (await client.images.edit(editParams)) as {
     data?: Array<{ b64_json?: string }>;
   };

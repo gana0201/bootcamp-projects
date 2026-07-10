@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { virtualTryOn } from "@/lib/openaiImage";
 
 export interface FitContext {
-  fitScore?: number;           // 1~10
-  sizeRecommendation?: string; // S, M, L ...
-  bodyType?: string;
-  fitAnalysis?: string;
-  details?: Record<string, string>;
+  // 의류 실측값 (cm) - GarmentInput.measurements 그대로
+  garmentMeasurements?: Record<string, number>;
+  // AI가 추정한 신체 치수 (cm) - BodyAnalysis.estimatedMeasurements
+  estimatedBodyMeasurements?: {
+    shoulderWidth?: string;
+    chestCircumference?: string;
+    waistCircumference?: string;
+    hipCircumference?: string;
+  };
+  // 의류 카테고리
+  category?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -21,12 +27,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "이미지 URL이 필요합니다" }, { status: 400 });
     }
 
-    // OpenAI API 키가 없으면 Mock 모드로 원본 이미지 반환
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({
-        resultImageUrl: humanImageUrl,
-        mock: true,
-      });
+      return NextResponse.json({ resultImageUrl: humanImageUrl, mock: true });
     }
 
     const resultImageUrl = await virtualTryOn(humanImageUrl, garmentImageUrl, fitContext);
