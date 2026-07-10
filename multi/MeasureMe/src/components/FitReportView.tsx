@@ -16,7 +16,27 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
   const handleTryOn = async () => {
     if (!humanImageUrl || !garmentImageUrl) return;
     setTryOnLoading(true); setTryOnError("");
-    try { const res = await fetch("/api/try-on", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ humanImageUrl, garmentImageUrl }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.error || "가상 피팅 실패"); } const data = await res.json(); setTryOnImage(data.resultImageUrl); if (data.mock) setTryOnError("Mock 모드입니다."); }
+    try {
+      const res = await fetch("/api/try-on", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          humanImageUrl,
+          garmentImageUrl,
+          fitContext: {
+            fitScore: report.fitScore,
+            sizeRecommendation: report.sizeRecommendation,
+            bodyType: bodyAnalysis.bodyType,
+            fitAnalysis: report.fitAnalysis,
+            details: report.details,
+          },
+        }),
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "가상 피팅 실패"); }
+      const data = await res.json();
+      setTryOnImage(data.resultImageUrl);
+      if (data.mock) setTryOnError("Mock 모드입니다.");
+    }
     catch (err) { setTryOnError(err instanceof Error ? err.message : "오류 발생"); } finally { setTryOnLoading(false); }
   };
 

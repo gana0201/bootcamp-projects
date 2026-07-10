@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { virtualTryOn } from "@/lib/openaiImage";
 
+export interface FitContext {
+  fitScore?: number;           // 1~10
+  sizeRecommendation?: string; // S, M, L ...
+  bodyType?: string;
+  fitAnalysis?: string;
+  details?: Record<string, string>;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { humanImageUrl, garmentImageUrl } = await request.json();
+    const { humanImageUrl, garmentImageUrl, fitContext } = await request.json() as {
+      humanImageUrl: string;
+      garmentImageUrl: string;
+      fitContext?: FitContext;
+    };
 
     if (!humanImageUrl || !garmentImageUrl) {
       return NextResponse.json({ error: "이미지 URL이 필요합니다" }, { status: 400 });
@@ -17,7 +29,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const resultImageUrl = await virtualTryOn(humanImageUrl, garmentImageUrl);
+    const resultImageUrl = await virtualTryOn(humanImageUrl, garmentImageUrl, fitContext);
     return NextResponse.json({ resultImageUrl });
   } catch (error) {
     console.error("Try-on error:", error);
