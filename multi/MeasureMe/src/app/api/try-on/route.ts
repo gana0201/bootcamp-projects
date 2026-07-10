@@ -13,6 +13,8 @@ export interface FitContext {
   };
   // 의류 카테고리
   category?: string;
+  // 실측값 없을 때 대체 표시용 추천 사이즈
+  sizeRecommendation?: string;
 }
 
 export async function POST(request: NextRequest) {

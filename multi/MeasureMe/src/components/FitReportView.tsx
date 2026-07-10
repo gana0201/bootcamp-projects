@@ -27,6 +27,7 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
             garmentMeasurements: garmentData.measurements,
             estimatedBodyMeasurements: bodyAnalysis.estimatedMeasurements,
             category: garmentData.category,
+            sizeRecommendation: report.sizeRecommendation,
           },
         }),
       });
