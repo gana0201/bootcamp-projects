@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { virtualTryOn } from "@/lib/openaiImage";
+import { virtualTryOn, checkWearability } from "@/lib/openaiImage";
 
 export interface FitContext {
   // 의류 실측값 (cm) - GarmentInput.measurements 그대로
@@ -31,6 +31,15 @@ export async function POST(request: NextRequest) {
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ resultImageUrl: humanImageUrl, mock: true });
+    }
+
+    // 착용 가능 여부 사전 검사
+    const wearability = checkWearability(fitContext);
+    if (!wearability.wearable) {
+      return NextResponse.json(
+        { error: `가상 피팅 불가 — ${wearability.reason}` },
+        { status: 422 }
+      );
     }
 
     const resultImageUrl = await virtualTryOn(humanImageUrl, garmentImageUrl, fitContext);

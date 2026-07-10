@@ -31,8 +31,7 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
           },
         }),
       });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "가상 피팅 실패"); }
-      const data = await res.json();
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "가상 피팅 실패"); }      const data = await res.json();
       setTryOnImage(data.resultImageUrl);
       if (data.mock) setTryOnError("Mock 모드입니다.");
     }
@@ -60,8 +59,16 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
               ) : (
                 <div className="text-center py-8">
                   {tryOnLoading ? (<div className="flex flex-col items-center gap-4"><div className="h-14 w-14 animate-spin rounded-full border-4 border-brand-cream border-t-brand-accent" /><p className="text-sm font-bold text-slate-700">생성 중...</p></div>)
+                  : tryOnError && tryOnError.includes("가상 피팅 불가") ? (
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center text-2xl">🚫</div>
+                      <p className="text-sm font-extrabold text-red-600">가상 피팅 불가</p>
+                      <p className="text-xs text-red-500 text-center leading-relaxed px-2">{tryOnError.replace("가상 피팅 불가 — ", "")}</p>
+                      <p className="text-xs text-slate-400 text-center">더 큰 사이즈의 의류로 다시 시도해주세요</p>
+                    </div>
+                  )
                   : (<button onClick={handleTryOn} className="px-8 py-4 bg-brand-accent hover:bg-brand-accent/90 text-white font-extrabold rounded-xl shadow-lg shadow-brand-accent/20 active:scale-95 transition-all flex items-center gap-2 mx-auto"><Wand2 className="w-5 h-5" /> 가상 피팅 생성</button>)}
-                  {tryOnError && !tryOnLoading && <p className="mt-3 text-sm text-brand-accent">{tryOnError}</p>}
+                  {tryOnError && !tryOnLoading && !tryOnError.includes("가상 피팅 불가") && <p className="mt-3 text-sm text-brand-accent">{tryOnError}</p>}
                 </div>
               )}
             </div>
