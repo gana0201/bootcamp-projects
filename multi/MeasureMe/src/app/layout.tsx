@@ -15,13 +15,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="min-h-screen bg-gradient-to-br from-brand-light/75 via-white to-brand-cream/60 text-slate-900 antialiased flex flex-col font-sans">
+      <body className="min-h-screen bg-brand-light text-slate-900 antialiased flex flex-col font-sans">
         <Header />
         <main className="flex-1 mx-auto max-w-7xl w-full px-4 md:px-6 lg:px-8 py-8">
           {children}
         </main>
-        <footer className="bg-white border-t border-slate-100 py-6 mt-12 px-6">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400 font-medium">
+        <footer className="bg-brand-dark py-6 mt-12 px-6">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-white/60 font-medium">
             <span>&copy; 2026 MeasureMe AI. All rights reserved.</span>
             <span className="flex items-center gap-1">패션을 사랑하는 모두를 위해</span>
           </div>

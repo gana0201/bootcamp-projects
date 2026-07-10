@@ -3,13 +3,30 @@ import { groq } from "@/lib/groq";
 import { BODY_ANALYSIS_PROMPT, FIT_REPORT_PROMPT } from "@/lib/prompts";
 import { saveAnalysis } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { formatAverageBodyForPrompt } from "@/lib/bodyData";
 import { v4 as uuidv4 } from "uuid";
+import { readFile } from "fs/promises";
+import path from "path";
 import type { BodyAnalysis, GarmentInput, FitReport } from "@/types";
 
 interface ProfileData {
   height?: string;
   weight?: string;
   gender?: string;
+  age?: string;
+}
+
+// 로컬 경로(/uploads/...)인 경우 base64 data URL로 변환
+async function resolveImageUrl(imageUrl: string): Promise<string> {
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+  // 로컬 파일 → base64
+  const filePath = path.join(process.cwd(), "public", imageUrl);
+  const buffer = await readFile(filePath);
+  const ext = path.extname(imageUrl).toLowerCase().replace(".", "");
+  const mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -29,11 +46,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bodyAnalysis = await analyzeBody(imageUrl, profileData);
+    const resolvedImageUrl = await resolveImageUrl(imageUrl);
+    const resolvedGarmentUrl = garmentImageUrl ? await resolveImageUrl(garmentImageUrl) : undefined;
+
+    const bodyAnalysis = await analyzeBody(resolvedImageUrl, profileData);
     const fitReport = await generateFitReport(
       bodyAnalysis,
       garmentData,
-      garmentImageUrl,
+      resolvedGarmentUrl,
       profileData
     );
 
@@ -82,8 +102,27 @@ async function analyzeBody(
     if (profileData.height) profileInfo.push(`키: ${profileData.height}cm`);
     if (profileData.weight) profileInfo.push(`몸무게: ${profileData.weight}kg`);
 
+    // BMI 계산
+    if (profileData.height && profileData.weight) {
+      const heightM = Number(profileData.height) / 100;
+      const bmi = Number(profileData.weight) / (heightM * heightM);
+      profileInfo.push(`BMI: ${bmi.toFixed(1)}`);
+      if (bmi < 18.5) profileInfo.push(`BMI 분류: 저체중`);
+      else if (bmi < 23) profileInfo.push(`BMI 분류: 정상`);
+      else if (bmi < 25) profileInfo.push(`BMI 분류: 과체중`);
+      else if (bmi < 30) profileInfo.push(`BMI 분류: 비만1단계`);
+      else profileInfo.push(`BMI 분류: 비만2단계`);
+    }
+
     if (profileInfo.length > 0) {
-      promptWithProfile += `\n\n참고할 사용자 프로필 정보:\n${profileInfo.join("\n")}`;
+      promptWithProfile += `\n\n## 사용자 프로필 정보:\n${profileInfo.join("\n")}`;
+    }
+
+    // 성별/연령대별 평균 신체 데이터 삽입
+    if (profileData.gender) {
+      const genderCode = profileData.gender === "male" ? "M" : "F";
+      const age = profileData.age ? Number(profileData.age) : undefined;
+      promptWithProfile += `\n\n${formatAverageBodyForPrompt(genderCode as "M" | "F", age)}`;
     }
   }
 
@@ -132,8 +171,25 @@ ${JSON.stringify(bodyAnalysis, null, 2)}
     if (profileData.gender) profileInfo.push(`성별: ${profileData.gender === "male" ? "남성" : "여성"}`);
     if (profileData.height) profileInfo.push(`키: ${profileData.height}cm`);
     if (profileData.weight) profileInfo.push(`몸무게: ${profileData.weight}kg`);
+    if (profileData.height && profileData.weight) {
+      const heightM = Number(profileData.height) / 100;
+      const bmi = Number(profileData.weight) / (heightM * heightM);
+      profileInfo.push(`BMI: ${bmi.toFixed(1)}`);
+      if (bmi < 18.5) profileInfo.push(`BMI 분류: 저체중`);
+      else if (bmi < 23) profileInfo.push(`BMI 분류: 정상`);
+      else if (bmi < 25) profileInfo.push(`BMI 분류: 과체중`);
+      else if (bmi < 30) profileInfo.push(`BMI 분류: 비만1단계`);
+      else profileInfo.push(`BMI 분류: 비만2단계`);
+    }
     if (profileInfo.length > 0) {
       userContext += `\n## 사용자 프로필:\n${profileInfo.join("\n")}\n`;
+    }
+
+    // 성별/연령대별 평균 신체 데이터 삽입
+    if (profileData.gender) {
+      const genderCode = profileData.gender === "male" ? "M" : "F";
+      const age = profileData.age ? Number(profileData.age) : undefined;
+      userContext += `\n${formatAverageBodyForPrompt(genderCode as "M" | "F", age)}\n`;
     }
   }
 
