@@ -99,103 +99,121 @@ export function checkWearability(fitContext?: FitContext): {
 }
 
 /**
- * 의류 실측값과 추정 신체 치수를 비교하여 시각적으로 표현 가능한 핏 묘사를 생성.
- * "타이트하게 당긴다" 같은 물리 표현 대신,
- * 옷 길이가 짧다, 소매가 짧다, 몸에 붙는다 같은 시각적 결과로 표현.
+ * 의류 실측값과 추정 신체 치수를 비교하여
+ * AI 이미지 모델이 이해하는 패션 용어로 핏을 묘사.
+ * "타이트하게 당긴다" 같은 물리 표현 대신
+ * "스킨핏", "크롭", "오버사이즈" 같은 시각적 패션 개념으로 지시.
  */
 function buildFitInstruction(fitContext?: FitContext): string {
   const g = fitContext?.garmentMeasurements;
   const b = fitContext?.estimatedBodyMeasurements;
   const sizeRec = fitContext?.sizeRecommendation;
+  const height = fitContext?.height;
 
   if (!g || Object.keys(g).length === 0 || !b) {
-    const sizeText = sizeRec ? `추천 사이즈 ${sizeRec} 기준으로` : "";
-    return `${sizeText} 체형에 자연스럽게 맞는 핏으로 표현. 옷의 원래 디자인 실루엣을 유지하며 깔끔하게 착용된 모습.`;
+    return sizeRec
+      ? `추천 사이즈 ${sizeRec}에 맞게 체형에 자연스럽게 착용된 모습으로 표현.`
+      : `체형에 자연스럽게 맞는 핏으로 표현.`;
   }
 
-  const lines: string[] = [];
+  const fitTerms: string[] = [];   // 패션 핏 용어
+  const visualCues: string[] = []; // 시각적 묘사
 
-  // ── 가슴 ──────────────────────────────────────────────
+  // ── 가슴 핏 ──────────────────────────────────────────
   if (g["가슴단면"] && b.chestCircumference) {
-    const garmentChest = g["가슴단면"] * 2;
-    const bodyChest = parseFloat(b.chestCircumference);
-    const ease = garmentChest - bodyChest;
-    if (ease < -4) {
-      lines.push(`가슴에 옷감이 팽팽하게 밀착되어 몸의 굴곡이 그대로 드러나는 실루엣`);
-    } else if (ease < 2) {
-      lines.push(`가슴 부위가 몸에 딱 붙는 슬림한 실루엣`);
-    } else if (ease < 8) {
-      lines.push(`가슴 부위가 자연스럽게 맞는 핏`);
-    } else if (ease < 16) {
-      lines.push(`가슴 부위에 여유가 있어 약간 루즈한 실루엣`);
+    const ease = g["가슴단면"] * 2 - parseFloat(b.chestCircumference);
+    if (ease < -8) {
+      fitTerms.push("스킨핏(skin-fit)");
+      visualCues.push("상체에 옷이 완전히 밀착되어 신체 굴곡이 그대로 드러나는 스킨핏 실루엣");
+    } else if (ease < -2) {
+      fitTerms.push("슬림핏(slim-fit)");
+      visualCues.push("상체에 옷이 딱 붙는 슬림핏 실루엣, 여유 없이 몸 라인을 따라 떨어짐");
+    } else if (ease < 4) {
+      fitTerms.push("레귤러핏(regular-fit)");
+      visualCues.push("가슴 부위가 자연스럽게 맞는 레귤러핏 실루엣");
+    } else if (ease < 12) {
+      fitTerms.push("루즈핏(loose-fit)");
+      visualCues.push("상체에 여유가 있는 루즈핏 실루엣, 옷이 몸에서 살짝 떠 있음");
     } else {
-      lines.push(`가슴 부위가 매우 넉넉하여 헐렁하게 걸쳐진 실루엣`);
+      fitTerms.push("오버사이즈(oversized)");
+      visualCues.push("상체에 옷이 헐렁하게 걸쳐진 오버사이즈 실루엣");
     }
   }
 
-  // ── 어깨 (직선값 비교) ────────────────────────────────
+  // ── 어깨 핏 ──────────────────────────────────────────
   if (g["어깨너비"] && b.shoulderWidth) {
     const ease = g["어깨너비"] - parseFloat(b.shoulderWidth);
     if (ease < -2) {
-      lines.push(`어깨가 옷보다 넓어 어깨 솔기가 팔 쪽으로 당겨진 모습`);
-    } else if (ease < 4) {
-      lines.push(`어깨 솔기가 어깨 끝에 딱 맞게 위치`);
-    } else if (ease < 10) {
-      lines.push(`어깨 솔기가 어깨 끝에서 약간 흘러내린 드롭숄더 스타일`);
+      visualCues.push("어깨 솔기가 어깨 끝보다 안쪽에 위치하여 어깨가 걸리는 모습");
+    } else if (ease < 3) {
+      visualCues.push("어깨 솔기가 어깨 끝에 정확히 위치");
+    } else if (ease < 8) {
+      visualCues.push("어깨 솔기가 어깨 끝에서 약간 내려온 드롭숄더 스타일");
     } else {
-      lines.push(`어깨 솔기가 어깨에서 많이 흘러내린 오버사이즈 드롭숄더`);
+      fitTerms.push("드롭숄더(drop-shoulder)");
+      visualCues.push("어깨 솔기가 팔 위쪽까지 크게 내려온 오버사이즈 드롭숄더 스타일");
     }
   }
 
-  // ── 총장 (키 대비 상의 길이) ──────────────────────────
-  if (g["총장"] && b.chestCircumference) {
-    // 키를 직접 받지 않으므로 가슴둘레로 체격 추정 후 상의 기준 길이와 비교
-    // 일반적으로 상의 정상 길이: 키 × 0.38~0.42 (허리~엉덩이 중간까지)
-    // fitContext에 키 정보가 있으면 사용
-    const height = fitContext?.height;
-    if (height) {
-      const normalLength = height * 0.40; // 키의 40%가 일반 상의 기준
-      const diff = g["총장"] - normalLength;
-      if (diff < -10) {
-        lines.push(`총장 ${g["총장"]}cm로 키 대비 매우 짧아 배꼽 위까지만 내려오는 크롭 기장`);
-      } else if (diff < -4) {
-        lines.push(`총장 ${g["총장"]}cm로 키 대비 짧아 배꼽 근처까지 내려오는 기장`);
-      } else if (diff < 4) {
-        lines.push(`총장 ${g["총장"]}cm로 키에 적당한 기장`);
-      } else {
-        lines.push(`총장 ${g["총장"]}cm로 엉덩이 아래까지 내려오는 긴 기장`);
-      }
+  // ── 총장 (기장) ───────────────────────────────────────
+  if (g["총장"] && height) {
+    const normalLength = height * 0.40;
+    const diff = g["총장"] - normalLength;
+    if (diff < -12) {
+      fitTerms.push("크롭(crop)");
+      visualCues.push(`총장 ${g["총장"]}cm로 배꼽 위에서 끝나는 크롭 기장 — 복부가 드러남`);
+    } else if (diff < -5) {
+      fitTerms.push("크롭(crop)");
+      visualCues.push(`총장 ${g["총장"]}cm로 배꼽 근처에서 끝나는 짧은 기장`);
+    } else if (diff < 5) {
+      visualCues.push(`총장 ${g["총장"]}cm로 허리 아래 자연스러운 기장`);
+    } else if (diff < 12) {
+      visualCues.push(`총장 ${g["총장"]}cm로 엉덩이 근처까지 내려오는 긴 기장`);
+    } else {
+      fitTerms.push("롱핏(long-fit)");
+      visualCues.push(`총장 ${g["총장"]}cm로 엉덩이 아래까지 내려오는 롱 기장`);
     }
   }
 
   // ── 소매 ─────────────────────────────────────────────
   if (g["소매길이"]) {
-    const sleeve = g["소매길이"];
-    if (sleeve < 50) {
-      lines.push(`소매길이 ${sleeve}cm로 손목보다 짧게 올라오는 7부~반팔 기장`);
-    } else if (sleeve < 58) {
-      lines.push(`소매길이 ${sleeve}cm로 손목 근처 기장`);
+    const s = g["소매길이"];
+    if (s < 45) {
+      visualCues.push(`소매길이 ${s}cm — 팔꿈치 위에서 끝나는 반팔 기장`);
+    } else if (s < 54) {
+      visualCues.push(`소매길이 ${s}cm — 팔꿈치 아래 7부 기장, 손목보다 짧음`);
+    } else if (s < 62) {
+      visualCues.push(`소매길이 ${s}cm — 손목 근처 기장`);
     } else {
-      lines.push(`소매길이 ${sleeve}cm로 손목 아래까지 내려오는 긴 소매`);
+      visualCues.push(`소매길이 ${s}cm — 손목 아래까지 내려오는 긴 소매`);
     }
   }
 
-  // ── 허리/엉덩이 ───────────────────────────────────────
+  // ── 허리 ─────────────────────────────────────────────
   if (g["허리단면"] && b.waistCircumference) {
     const ease = g["허리단면"] * 2 - parseFloat(b.waistCircumference);
-    if (ease < -4) lines.push(`허리 부위가 몸에 꽉 끼어 몸 라인이 드러나는 실루엣`);
-    else if (ease < 4) lines.push(`허리 부위가 딱 맞는 핏`);
-    else if (ease > 12) lines.push(`허리 부위가 넉넉하게 여유로운 핏`);
+    if (ease < -4) {
+      visualCues.push("허리가 몸에 완전히 밀착되어 허리 라인이 드러남");
+    } else if (ease < 4) {
+      visualCues.push("허리 부위가 딱 맞는 핏");
+    } else if (ease > 12) {
+      visualCues.push("허리 부위가 여유롭게 떨어지는 실루엣");
+    }
   }
 
-  if (lines.length === 0) {
-    const sizeText = sizeRec ? `추천 사이즈 ${sizeRec} 기준으로` : "";
-    return `${sizeText} 체형에 자연스럽게 맞는 핏으로 표현.`;
+  if (fitTerms.length === 0 && visualCues.length === 0) {
+    return `체형에 자연스럽게 맞는 핏으로 표현.`;
   }
 
-  // 전체 요약 지시
-  const summary = lines.join(", ");
-  return `이 옷의 착용 모습을 아래 수치 기반으로 정확하게 표현하세요:\n${lines.map(l => `  - ${l}`).join("\n")}\n\n이 시각적 특성들이 이미지에 명확하게 드러나야 합니다. 실루엣과 기장을 수치에 맞게 반드시 표현하세요.`;
+  const fitStyle = fitTerms.length > 0
+    ? `이 옷의 핏 스타일: **${fitTerms.join(", ")}**`
+    : "";
+
+  const visualDesc = visualCues.length > 0
+    ? `시각적으로 반드시 표현해야 할 요소:\n${visualCues.map(v => `  - ${v}`).join("\n")}`
+    : "";
+
+  return [fitStyle, visualDesc].filter(Boolean).join("\n\n");
 }
 
 /**
@@ -222,19 +240,17 @@ export async function virtualTryOn(
 
   const fitInstruction = buildFitInstruction(fitContext);
 
-  const prompt = `첫 번째 이미지는 사람의 전신 사진이고, 두 번째 이미지는 의류입니다.
-첫 번째 이미지의 사람이 두 번째 이미지의 옷을 입은 모습을 사실적으로 생성해주세요.
+  const prompt = `두 장의 이미지가 있습니다. 첫 번째는 사람의 전신 사진, 두 번째는 의류 사진입니다.
+아래 핏 스타일과 시각적 요소를 반영하여, 이 사람이 이 의류를 착용한 모습을 사실적으로 생성하세요.
 
-[절대 규칙]
-- 핏 지시사항을 임의로 "보기 좋게" 수정하거나 보정하지 마세요
-- 옷이 타이트하면 반드시 타이트하게, 헐렁하면 반드시 헐렁하게 표현하세요
-- 사람의 얼굴, 체형, 헤어스타일, 피부톤을 그대로 유지하세요
-- 옷의 색상, 패턴, 디자인, 질감을 정확히 반영하세요
-- 배경과 조명은 원본 사람 사진과 동일하게 유지하세요
-- 사진처럼 사실적으로(photorealistic) 표현하세요
+${fitInstruction}
 
-[핏 지시사항 - 입력된 실측 수치 기반, 반드시 반영]
-${fitInstruction}`;
+추가 규칙:
+- 사람의 얼굴, 피부톤, 헤어스타일, 체형을 그대로 유지
+- 의류의 색상, 패턴, 소재감, 디자인 디테일을 정확히 반영
+- 배경과 조명은 원본 사람 사진과 동일하게 유지
+- 사진처럼 사실적으로(photorealistic) 표현
+- 위에 명시된 핏 스타일(슬림핏, 크롭, 오버사이즈 등)을 이미지에 명확하게 반영할 것`;
 
   const editParams: Parameters<typeof client.images.edit>[0] = {
     model: IMAGE_MODEL,

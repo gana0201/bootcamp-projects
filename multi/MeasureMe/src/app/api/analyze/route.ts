@@ -4,6 +4,7 @@ import { BODY_ANALYSIS_PROMPT, FIT_REPORT_PROMPT } from "@/lib/prompts";
 import { saveAnalysis } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { formatAverageBodyForPrompt } from "@/lib/bodyData";
+import { getSizeChart } from "@/lib/sizeChart";
 import { v4 as uuidv4 } from "uuid";
 import { readFile } from "fs/promises";
 import path from "path";
@@ -159,8 +160,6 @@ async function generateFitReport(
   garmentImageUrl?: string,
   profileData?: ProfileData
 ): Promise<FitReport> {
-  const hasMeasurements = Object.keys(garmentData.measurements).length > 0;
-
   let userContext = `
 ## 사용자 체형 분석 결과:
 ${JSON.stringify(bodyAnalysis, null, 2)}
@@ -199,8 +198,29 @@ ${JSON.stringify(bodyAnalysis, null, 2)}
 - 카테고리: ${garmentData.category}
 `;
 
+  // 실측값 우선, 없으면 선택 사이즈 치수표로 보완
+  let effectiveMeasurements = garmentData.measurements;
+  if (garmentData.selectedSize && Object.keys(garmentData.measurements).length === 0) {
+    const genderForChart = (garmentData.gender === "male" || garmentData.gender === "female")
+      ? garmentData.gender
+      : (profileData?.gender === "male" || profileData?.gender === "female" ? profileData.gender : "");
+    effectiveMeasurements = getSizeChart(
+      garmentData.category,
+      genderForChart as "male" | "female" | "",
+      garmentData.selectedSize as import("@/lib/sizeChart").SizeLabel
+    );
+  }
+
+  const hasMeasurements = Object.keys(effectiveMeasurements).length > 0;
+
   if (hasMeasurements) {
-    userContext += `- 실측 수치(cm): ${JSON.stringify(garmentData.measurements, null, 2)}\n`;
+    const sourceLabel = garmentData.selectedSize && Object.keys(garmentData.measurements).length === 0
+      ? `선택 사이즈(${garmentData.selectedSize}) 기준 표준 치수`
+      : "실측 수치";
+    userContext += `- ${sourceLabel}(cm): ${JSON.stringify(effectiveMeasurements, null, 2)}\n`;
+    if (garmentData.selectedSize) {
+      userContext += `- 선택 사이즈: ${garmentData.selectedSize}\n`;
+    }
   } else {
     userContext += `- 실측 수치: 미제공 (의류 사진 기반으로 추정해주세요)\n`;
   }

@@ -149,7 +149,7 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <GarmentForm onSubmit={handleGarmentSubmit} onBack={() => setStep("upload")} />
+          <GarmentForm onSubmit={handleGarmentSubmit} onBack={() => setStep("upload")} profileGender={profileData.gender || ""} />
         </div>
       )}
 
