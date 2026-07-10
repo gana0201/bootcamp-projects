@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Vercel Blob 토큰이 있으면 Vercel Blob 사용, 없으면 로컬 저장
     if (process.env.BLOB_READ_WRITE_TOKEN) {
       const { put } = await import("@vercel/blob");
-      const blob = await put(file.name, file, { access: "public" });
+      const blob = await put(file.name, file, { access: "public", addRandomSuffix: true });
       return NextResponse.json({ imageUrl: blob.url });
     }
 
