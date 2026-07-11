@@ -34,8 +34,11 @@ export default function GarmentForm({ onSubmit, onBack, profileGender }: Props) 
   const gender: GenderType = profileGender || "";
 
   // 선택한 사이즈의 표준 치수 (placeholder 및 fallback용)
-  const sizeChartValues: Record<string, number> =
-    selectedSize ? getSizeChart(category, gender, selectedSize as SizeLabel) : {};
+  // SIZE_LABELS에 포함된 표준 사이즈일 때만 치수표 조회
+  const isStandardSize = selectedSize !== "" && SIZE_LABELS.includes(selectedSize as SizeLabel);
+  const sizeChartValues: Record<string, number> = isStandardSize
+    ? getSizeChart(category, gender, selectedSize as SizeLabel)
+    : {};
 
   const handleCategoryChange = (cat: string) => {
     setCategory(cat);

@@ -198,16 +198,19 @@ ${JSON.stringify(bodyAnalysis, null, 2)}
 - 카테고리: ${garmentData.category}
 `;
 
-  // 실측값 우선, 없으면 선택 사이즈 치수표로 보완
+  // 실측값 우선, 없으면 선택 사이즈 치수표로 보완 (표준 사이즈일 때만)
   let effectiveMeasurements = garmentData.measurements;
-  if (garmentData.selectedSize && Object.keys(garmentData.measurements).length === 0) {
+  const isStandardSize = garmentData.selectedSize &&
+    ["XS","S","M","L","XL","XXL","3XL"].includes(garmentData.selectedSize.toUpperCase());
+
+  if (isStandardSize && Object.keys(garmentData.measurements).length === 0) {
     const genderForChart = (garmentData.gender === "male" || garmentData.gender === "female")
       ? garmentData.gender
       : (profileData?.gender === "male" || profileData?.gender === "female" ? profileData.gender : "");
     effectiveMeasurements = getSizeChart(
       garmentData.category,
       genderForChart as "male" | "female" | "",
-      garmentData.selectedSize as import("@/lib/sizeChart").SizeLabel
+      garmentData.selectedSize!.toUpperCase() as import("@/lib/sizeChart").SizeLabel
     );
   }
 
