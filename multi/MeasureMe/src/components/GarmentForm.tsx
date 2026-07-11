@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Shirt, Upload, Sliders, Info, Check, ArrowRight } from "lucide-react";
 import type { GarmentInput } from "@/types";
 import { getSizeChart, SIZE_LABELS, type SizeLabel, type GenderType } from "@/lib/sizeChart";
@@ -45,6 +45,23 @@ export default function GarmentForm({ onSubmit, onBack, profileGender }: Props) 
     setMeasurements({});
     setSelectedSize("");
   };
+
+  // gender 또는 category가 바뀌면 표준 사이즈 치수를 재계산
+  useEffect(() => {
+    if (!isStandardSize) return;
+    const chart = getSizeChart(category, gender, selectedSize as SizeLabel);
+    setMeasurements((prev) => {
+      const next = { ...prev };
+      for (const key of CATEGORY_MEASUREMENTS[category] || []) {
+        // 직접 입력한 값이 없는 항목만 업데이트
+        if (!prev[key] || prev[key] === "") {
+          next[key] = String(chart[key] ?? "");
+        }
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gender, category]);
 
   const handleGarmentImage = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) { alert("이미지 파일만 업로드 가능합니다"); return; }
@@ -182,12 +199,9 @@ export default function GarmentForm({ onSubmit, onBack, profileGender }: Props) 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-slate-700">사이즈</span>
-              {selectedSize && SIZE_LABELS.includes(selectedSize as SizeLabel) && (
-                <span className="text-xs text-brand-accent font-bold">
-                  {selectedSize} 표준 치수 자동 적용
-                  {gender && ` (${gender === "male" ? "남성" : "여성"} 기준)`}
-                </span>
-              )}
+              <span className="text-xs font-bold text-slate-400 bg-brand-cream px-2 py-0.5 rounded-full">
+                {gender === "male" ? "👨 남성 기준" : gender === "female" ? "👩 여성 기준" : "기준 미설정 (1단계에서 성별 선택)"}
+              </span>
             </div>
             <input
               type="text"
@@ -213,7 +227,8 @@ export default function GarmentForm({ onSubmit, onBack, profileGender }: Props) 
               className="w-full bg-brand-light border border-brand-cream focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 rounded-xl px-4 py-3 text-base font-bold text-slate-800 outline-none"
             />
             <p className="text-xs text-slate-400">
-              XS · S · M · L · XL · XXL · 3XL 입력 시 표준 치수가 아래 항목에 자동으로 채워집니다.
+              XS · S · M · L · XL · XXL · 3XL 입력 시
+              {gender ? ` ${gender === "male" ? "남성" : "여성"} 기준` : ""} 표준 치수가 아래 항목에 자동으로 채워집니다.
             </p>
           </div>
 

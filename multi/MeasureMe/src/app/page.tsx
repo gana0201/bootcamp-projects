@@ -176,6 +176,7 @@ export default function Home() {
             humanImageUrl={imageUrl}
             garmentImageUrl={garmentImgUrl}
             profileHeight={profileData.height ? Number(profileData.height) : undefined}
+            profileData={profileData}
           />
         </div>
       )}

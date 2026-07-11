@@ -4,9 +4,10 @@ import { useState } from "react";
 import { FileText, CheckCircle2, Sparkles, Sliders, Info, Check, RefreshCw, Wand2 } from "lucide-react";
 import type { AnalysisResult } from "@/types";
 
-interface Props { result: AnalysisResult; onReset: () => void; humanImageUrl?: string; garmentImageUrl?: string; profileHeight?: number; }
+interface ProfileData { height: string; weight: string; gender: "male" | "female" | ""; }
+interface Props { result: AnalysisResult; onReset: () => void; humanImageUrl?: string; garmentImageUrl?: string; profileHeight?: number; profileData?: ProfileData; }
 
-export default function FitReportView({ result, onReset, humanImageUrl, garmentImageUrl, profileHeight }: Props) {
+export default function FitReportView({ result, onReset, humanImageUrl, garmentImageUrl, profileHeight, profileData }: Props) {
   const { report, bodyAnalysis, garmentData } = result;
   const [tryOnImage, setTryOnImage] = useState<string>("");
   const [tryOnLoading, setTryOnLoading] = useState(false);
@@ -30,6 +31,10 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
             sizeRecommendation: report.sizeRecommendation,
             height: profileHeight,
           },
+          // IPYNB 모델 예측값 자동 계산용 프로필
+          profile: profileData
+            ? { height: profileData.height, weight: profileData.weight, gender: profileData.gender }
+            : undefined,
         }),
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "가상 피팅 실패"); }      const data = await res.json();
@@ -136,6 +141,14 @@ export default function FitReportView({ result, onReset, humanImageUrl, garmentI
               <div className="space-y-3">{report.cautions.map((c, i) => (<div key={i} className="flex gap-3 text-slate-700 bg-brand-accent/5 p-4 rounded-xl border border-brand-accent/20"><Info className="w-4 h-4 text-brand-accent shrink-0 mt-1" /><span>{c}</span></div>))}</div>
             </div>
           )}
+
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-sm text-amber-800">
+            <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold">신체 치수 예측 오차 안내</p>
+              <p className="leading-relaxed">통계 모델 기반 예측값은 실제 측정치와 <span className="font-extrabold">1~3cm 내외의 오차</span>가 발생할 수 있습니다. 근육량·체지방 분포·자세에 따라 개인차가 클 수 있으니, 정확한 핏 확인은 실제 착용을 권장합니다.</p>
+            </div>
+          </div>
 
           <div className="flex gap-3 p-4 bg-brand-primary/5 border border-brand-primary/15 rounded-xl text-slate-500 text-sm">
             <Info className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" />
