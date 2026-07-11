@@ -12,4 +12,4 @@
 ├── 📁 cloud/             # 클라우드 응용 서비스 과제 및 프로젝트
 │   └── 📁 PassFast/      # 패스패스트 웹 서비스 (Client / Server)
 └── 📁 multi/             # 멀티모달 AI 관련 프로젝트
-    └── 📁 MeasureMe/     # 메저미: 실측 기반 AI 가상 피팅 및 리포트 서비스
+    └── 📁 MeasureMe/     # 메저미: 실측 기반 AI 가상 피팅 및 리포트 서비스 / https://bootcamp-projects-jade.vercel.app/
